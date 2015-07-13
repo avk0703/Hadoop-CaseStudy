@@ -1,0 +1,105 @@
+package com.impetus.MovieLens;
+
+
+import java.io.IOException;
+//import mutipleInput.Join;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
+
+
+
+
+/**
+ * @author impadmin
+ *MovieRating:Dispalys Movie Name with total Rating given to the movie
+ */
+public class MovieRating extends Configured implements Tool 
+{
+	public static class Ratings extends Mapper<Object, Text, Text, Text>
+	{
+	  public void map(Object key, Text value, Context context)
+	  throws IOException, InterruptedException
+	  {
+		   String[] line=value.toString().split("::"); 
+		   context.write(new Text(line[1]), new Text(line[2]));
+	  }
+ }
+
+
+public static class Movies extends Mapper<Object, Text, Text, Text>
+ {
+	  public void map(Object key, Text value, Context context)
+	  throws IOException, InterruptedException
+	  {
+			  String[] line=value.toString().split("::"); 
+			  context.write(new Text(line[0]), new Text(line[1]));
+	  }
+ }
+
+ public static class MovieRatingReducer extends Reducer<Text, Text, Text, Text>
+ {
+	 	Text valEmit = new Text();
+	  
+	    int sum=0;
+	    
+	    public void reduce(Text key, Iterable<Text> values, Context context)
+	            throws IOException, InterruptedException {
+		        String character = "";
+		        String number = "";
+		        for (Text value : values) {
+			        	String val = value.toString();
+			            char myChar = val.charAt(0);
+		
+			            if (Character.isDigit(myChar) && val.length()<=2) {
+			            	sum+=Integer.parseInt(val);
+			            } 
+			            else {
+			                character = val;
+			            }
+		        }
+		        number=sum+"";
+		        context.write(new Text(character), new Text("\tTOTAL RATING: "+number));
+	    }
+}
+
+
+ public int run(String[] args) throws Exception {
+	 Configuration conf = new Configuration();
+	 Job job = new Job(conf);
+	 job.setJarByClass(UserMovieRating.class);
+	
+	 MultipleInputs.addInputPath(job,new Path("/user/impadmin/ratings.txt"),TextInputFormat.class,Ratings.class);
+	 MultipleInputs.addInputPath(job,new Path("/user/impadmin/movies.txt"),TextInputFormat.class,Movies.class);
+	  
+	 FileOutputFormat.setOutputPath(job, new Path("/user/impadmin/MovieRating.txt"));
+	 
+	 job.setReducerClass(MovieRatingReducer.class);
+	 job.setOutputKeyClass(Text.class);
+	 job.setOutputValueClass(Text.class);
+	 
+	 return (job.waitForCompletion(true) ? 0 : 1);
+
+ }
+
+ public static void main(String[] args) throws Exception {
+
+  
+  int ecode = ToolRunner.run(new MovieRating(), args);
+  System.exit(ecode);
+
+  
+ }
+
+}
