@@ -1,0 +1,113 @@
+package com.impetus.MovieLens;
+
+
+
+
+
+import java.io.IOException;
+//import mutipleInput.Join;
+
+
+import java.util.ArrayList;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.input.MultipleInputs;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
+
+
+
+
+/**
+ * @author impadmin
+ *MovieMaxMinAvgRating:Lists all the Movies with the max,min,average ratings given by any user
+
+ */
+public class MovieMaxMinAvgRating extends Configured implements Tool 
+{
+	public static class IdRating extends Mapper<Object, Text, Text, Text>
+	{
+	  public void map(Object key, Text value, Context context)
+	  throws IOException, InterruptedException
+	  {
+		   String[] line=value.toString().split("::"); 
+		   String lineInput="Movie Id:"+line[1];
+		   context.write(new Text(lineInput), new Text(line[2]));
+	  }
+ }
+
+
+
+ public static class MovieIdRatingReducer extends Reducer<Text, Text, Text, Text>
+ {
+	 	Text valEmit = new Text();
+	  
+	    int sum=0;
+	    
+	    //@SuppressWarnings("null")
+		public void reduce(Text key, Iterable<Text> values, Context context)
+	            throws IOException, InterruptedException {
+		       
+			ArrayList<Integer> input = new ArrayList<Integer>();
+	    	int i=0;
+	    	for(Text val:values){
+	    		input.add(Integer.parseInt(val.toString()));
+	    	}
+	    	for(int k=0;k!=input.size();k++){
+	    		sum+=input.get(k);
+	    	}
+	    	sum=sum/input.size();
+	    	 int smallest = input.get(0);
+             int largetst = input.get(0);
+            
+             for(int p=1; p< input.size(); p++)
+             {
+                     if(input.get(p) > largetst)
+                             largetst = input.get(p);
+                     else if (input.get(p) < smallest)
+                             smallest =input.get(p);
+                    
+             }
+             
+	    	context.write(key, new Text("Average:"+sum+"\tMax:"+largetst+"\tMin:"+smallest));
+	    }
+}
+
+
+ public int run(String[] args) throws Exception {
+	 Configuration conf = new Configuration();
+	 @SuppressWarnings("deprecation")
+	Job job = new Job(conf);
+	 job.setJarByClass( MovieMaxMinAvgRating.class);
+	
+	 MultipleInputs.addInputPath(job,new Path("/user/impadmin/ratings.txt"),TextInputFormat.class,IdRating.class);
+	
+	 FileOutputFormat.setOutputPath(job, new Path("/user/impadmin/ MovieMaxMinAvgRating.txt"));
+	 
+	 job.setReducerClass(MovieIdRatingReducer.class);
+	 job.setOutputKeyClass(Text.class);
+	 job.setOutputValueClass(Text.class);
+	 
+	 return (job.waitForCompletion(true) ? 0 : 1);
+
+ }
+
+ public static void main(String[] args) throws Exception {
+
+  
+  int ecode = ToolRunner.run(new MovieMaxMinAvgRating(), args);
+  System.exit(ecode);
+
+  
+ }
+
+}
